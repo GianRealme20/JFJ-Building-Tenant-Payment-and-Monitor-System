@@ -23,8 +23,11 @@ from dotenv import load_dotenv
 
 import data_tools as dt
 
+BASE_DIR = Path(__file__).resolve().parent
+ENV_PATH = BASE_DIR / ".env"
+
 # Load environment variables from .env file
-load_dotenv()
+load_dotenv(ENV_PATH, override=True)
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
@@ -34,8 +37,14 @@ app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
 # The username and password are stored in plain text inside .env so
 # they are easy to see and change.
 # -------------------------------------------------------------------
-ADMIN_USERNAME = (os.getenv("ADMIN_USERNAME") or "admin").strip()
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD") or ""
+def get_admin_credentials():
+    """Load latest credentials from .env so edits take effect immediately."""
+    load_dotenv(ENV_PATH, override=True)
+    username = (os.getenv("ADMIN_USERNAME") or "admin").strip()
+    password = (os.getenv("ADMIN_PASSWORD") or "").strip()
+    return username, password
+
+ADMIN_USERNAME, ADMIN_PASSWORD = get_admin_credentials()
 
 if not ADMIN_PASSWORD:
     app.logger.warning("ADMIN_PASSWORD is not set in .env!")
@@ -222,12 +231,14 @@ def login():
 
     if request.method == "POST":
         username = (request.form.get("username") or "").strip()
-        password = request.form.get("password") or ""
+        password = (request.form.get("password") or "").strip()
 
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+        admin_username, admin_password = get_admin_credentials()
+
+        if username == admin_username and password == admin_password:
             session["admin_authenticated"] = True
-            session["admin_username"] = ADMIN_USERNAME
-            log_activity("admin_login", f"Admin '{ADMIN_USERNAME}' signed in.")
+            session["admin_username"] = admin_username
+            log_activity("admin_login", f"Admin '{admin_username}' signed in.")
             flash("Welcome back! You are signed in.", "success")
             return redirect(next_url or url_for("dashboard"))
 
@@ -238,7 +249,8 @@ def login():
 
 @app.route("/logout", methods=["POST"])
 def logout():
-    username = session.get("admin_username", ADMIN_USERNAME or "admin")
+    admin_username, _ = get_admin_credentials()
+    username = session.get("admin_username", admin_username or "admin")
     if session.get("admin_authenticated"):
         log_activity("admin_logout", f"Admin '{username}' signed out.")
     session.clear()
