@@ -1,0 +1,13 @@
+{
+  "name": "jfj-renthouse-system",
+  "version": "1.0.0",
+  "description": "JFJ Renthouse System with Tailwind CSS and Flask",
+  "scripts": {
+    "build:css": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css",
+    "build:css:min": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --minify",
+    "watch:css": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

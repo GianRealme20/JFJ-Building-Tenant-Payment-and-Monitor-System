@@ -1,0 +1,830 @@
+{% extends "base.html" %}
+
+{% block title %}Tenant Records | JFJ Renthouse System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Rooms datalist for auto-complete -->
+    <datalist id="tenantRoomList">
+        {% for room in rooms %}
+            <option value="{{ room }}"></option>
+        {% endfor %}
+    </datalist>
+
+    <!-- Page Header & Action Controls -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-1">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Tenant Records</h1>
+            <p class="text-sm text-slate-500 mt-1 flex items-center flex-wrap gap-2">
+                <span>Add new tenants, update their details, and move out or delete old tenants when their stay ends.</span>
+                {% if selected_room %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 border border-sky-200">
+                        Room Filter: {{ selected_room }}
+                    </span>
+                {% endif %}
+            </p>
+        </div>
+        <div class="flex items-center gap-2.5">
+            <a href="{{ url_for('history') }}" class="inline-flex items-center px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl border border-slate-200 shadow-xs hover:shadow transition">
+                <svg class="w-4 h-4 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Activity History
+            </a>
+            <button type="button" onclick="openAddTenantModal()" class="inline-flex items-center px-4 py-2.5 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white text-sm font-semibold rounded-xl shadow-xs hover:shadow transition focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Add Tenant
+            </button>
+        </div>
+    </div>
+
+    <!-- Tenant KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+
+        <!-- Active Tenants -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold tracking-wider text-slate-500 uppercase">Active Tenants</span>
+                <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="text-2xl font-extrabold text-slate-900 tracking-tight">{{ active_count }}</div>
+                <p class="text-xs text-slate-500 mt-1">Currently living in the building</p>
+            </div>
+        </div>
+
+        <!-- Monthly Rent Roll -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold tracking-wider text-slate-500 uppercase">Monthly Rent Roll</span>
+                <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="text-2xl font-extrabold text-sky-600 tracking-tight">₱{{ "{:,.2f}".format(monthly_rent_roll or 0) }}</div>
+                <p class="text-xs text-slate-500 mt-1">Expected monthly rent from active tenants</p>
+            </div>
+        </div>
+
+        <!-- Occupied Rooms -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold tracking-wider text-slate-500 uppercase">Occupied Rooms</span>
+                <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="text-2xl font-extrabold text-indigo-600 tracking-tight">{{ occupied_rooms|length }}<span class="text-sm font-semibold text-slate-400"> / {{ total_rooms }}</span></div>
+                <p class="text-xs text-slate-500 mt-1">{{ occupancy_rate }}% occupancy based on active tenants</p>
+            </div>
+        </div>
+
+        <!-- Moved Out -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold tracking-wider text-slate-500 uppercase">Moved Out</span>
+                <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="text-2xl font-extrabold text-slate-900 tracking-tight">{{ moved_out_count }}</div>
+                <p class="text-xs text-slate-500 mt-1">Past tenants kept for your records</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+        <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+
+            <!-- Search -->
+            <div class="relative flex-1 max-w-md">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+                <input
+                    type="text"
+                    id="tenantSearchInput"
+                    placeholder="Search tenant, room, contact, email..."
+                    onkeyup="filterTenantsTable()"
+                    class="block w-full pl-10 pr-4 py-2 text-sm bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition outline-none"
+                >
+            </div>
+
+            <!-- Status filter + room filter -->
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1" id="tenantStatusTabs">
+                    <button type="button" data-status-filter="all" class="status-tab px-3 py-1.5 text-xs font-semibold rounded-lg bg-white text-sky-700 shadow-xs">All</button>
+                    <button type="button" data-status-filter="Active" class="status-tab px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900">Active</button>
+                    <button type="button" data-status-filter="Moved Out" class="status-tab px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900">Moved Out</button>
+                </div>
+
+                <div class="relative min-w-[150px]">
+                    <select
+                        id="tenantRoomSelect"
+                        onchange="handleTenantRoomFilter(this.value)"
+                        class="w-full appearance-none bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 text-slate-800 text-sm rounded-xl py-2 pl-3.5 pr-8 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none font-medium cursor-pointer transition"
+                    >
+                        <option value="" {% if not selected_room %}selected{% endif %}>All Rooms</option>
+                        {% for room in rooms %}
+                            <option value="{{ room }}" {% if selected_room == room %}selected{% endif %}>Room {{ room }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </div>
+                </div>
+
+                {% if selected_room %}
+                    <a href="{{ url_for('tenants') }}" class="inline-flex items-center px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
+                        <svg class="w-3.5 h-3.5 mr-1 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        Clear Room
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Tenants Table -->
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center space-x-2">
+                <h2 class="text-base font-bold text-slate-900">Tenant Directory</h2>
+                <span id="tenantCountBadge" class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                    {{ tenants|length }} records
+                </span>
+            </div>
+            <span class="text-xs text-slate-500">Active tenants are listed first</span>
+        </div>
+
+        {% if tenants and tenants|length > 0 %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm" id="tenantsTable">
+                    <thead>
+                        <tr class="bg-slate-50/75 border-b border-slate-200/80 text-xs uppercase font-semibold text-slate-500 tracking-wider">
+                            <th scope="col" class="py-3.5 px-5">Tenant</th>
+                            <th scope="col" class="py-3.5 px-4">Room</th>
+                            <th scope="col" class="py-3.5 px-4 text-right">Monthly Rent</th>
+                            <th scope="col" class="py-3.5 px-4 text-right">Rent Paid</th>
+                            <th scope="col" class="py-3.5 px-4 text-right">Expenses</th>
+                            <th scope="col" class="py-3.5 px-4">Move In</th>
+                            <th scope="col" class="py-3.5 px-4">Move Out</th>
+                            <th scope="col" class="py-3.5 px-4 text-center">Status</th>
+                            <th scope="col" class="py-3.5 px-4 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for tenant in tenants %}
+                            {% set status = tenant.status or 'Active' %}
+                            <tr class="hover:bg-slate-50/70 transition-colors tenant-row" data-status="{{ status }}">
+                                <!-- Tenant -->
+                                <td class="py-4 px-5 whitespace-nowrap">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-9 h-9 rounded-full {% if status == 'Active' %}bg-sky-50 border-sky-200 text-sky-700{% else %}bg-slate-100 border-slate-200 text-slate-500{% endif %} border flex items-center justify-center font-bold text-xs uppercase">
+                                            {{ (tenant.tenant_name or '?')[:2] }}
+                                        </div>
+                                        <div>
+                                            <span class="font-semibold text-slate-900 block">{{ tenant.tenant_name }}</span>
+                                            <span class="text-[11px] text-slate-400">
+                                                {% if tenant.contact_number %}
+                                                    {{ tenant.contact_number }}
+                                                {% elif tenant.email %}
+                                                    {{ tenant.email }}
+                                                {% else %}
+                                                    No contact saved
+                                                {% endif %}
+                                                {% if tenant.email and tenant.contact_number %} &bull; {{ tenant.email }}{% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <!-- Room -->
+                                <td class="py-4 px-4 whitespace-nowrap">
+                                    <a href="{{ url_for('dashboard', room=tenant.room_no) }}" class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 hover:bg-sky-50 text-slate-700 hover:text-sky-700 border border-slate-200 hover:border-sky-200 transition" title="Filter payments for Room {{ tenant.room_no }}">
+                                        Room {{ tenant.room_no }}
+                                    </a>
+                                </td>
+
+                                <!-- Monthly Rent -->
+                                <td class="py-4 px-4 whitespace-nowrap text-right font-bold text-slate-800">
+                                    ₱{{ "{:,.2f}".format(tenant.monthly_rent|float) if tenant.monthly_rent is not none else "0.00" }}
+                                </td>
+
+                                <!-- Rent Paid (Connected Payments Ledger) -->
+                                <td class="py-4 px-4 whitespace-nowrap text-right">
+                                    {% if tenant.ledger_paid and tenant.ledger_paid > 0 %}
+                                        <a href="{{ url_for('dashboard', room=tenant.room_no) }}" class="font-bold text-emerald-600 hover:text-emerald-700 hover:underline inline-flex items-center" title="View Room {{ tenant.room_no }} payments in dashboard">
+                                            ₱{{ "{:,.2f}".format(tenant.ledger_paid|float) }}
+                                        </a>
+                                    {% else %}
+                                        <span class="text-xs text-slate-400 font-medium">₱0.00</span>
+                                    {% endif %}
+                                </td>
+
+                                <!-- Expenses (Connected Unit Expenses Ledger) -->
+                                <td class="py-4 px-4 whitespace-nowrap text-right">
+                                    {% if tenant.ledger_expenses and tenant.ledger_expenses > 0 %}
+                                        <a href="{{ url_for('expenses', room=tenant.room_no) }}" class="font-bold text-rose-600 hover:text-rose-700 hover:underline inline-flex items-center" title="View Room {{ tenant.room_no }} expenses">
+                                            ₱{{ "{:,.2f}".format(tenant.ledger_expenses|float) }}
+                                        </a>
+                                    {% else %}
+                                        <span class="text-xs text-slate-400 font-medium">₱0.00</span>
+                                    {% endif %}
+                                </td>
+
+                                <!-- Move In -->
+                                <td class="py-4 px-4 whitespace-nowrap text-xs text-slate-600">
+                                    {{ tenant.move_in_date or '—' }}
+                                </td>
+
+                                <!-- Move Out -->
+                                <td class="py-4 px-4 whitespace-nowrap text-xs {% if tenant.move_out_date %}text-rose-500 font-medium{% else %}text-slate-400{% endif %}">
+                                    {{ tenant.move_out_date or '—' }}
+                                </td>
+
+                                <!-- Status -->
+                                <td class="py-4 px-4 whitespace-nowrap text-center">
+                                    {% if status == 'Active' %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            <svg class="w-2.5 h-2.5 mr-1 text-emerald-500" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
+                                            Active
+                                        </span>
+                                    {% else %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                                            <svg class="w-2.5 h-2.5 mr-1 text-slate-400" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
+                                            Moved Out
+                                        </span>
+                                    {% endif %}
+                                </td>
+
+                                <!-- Actions -->
+                                <td class="py-4 px-4 whitespace-nowrap text-center">
+                                    <div class="inline-flex items-center space-x-1.5">
+                                        <!-- Quick Record Payment -->
+                                        <a
+                                            href="{{ url_for('dashboard', record_payment=1, tenant_id=tenant._id, room=tenant.room_no) }}"
+                                            class="inline-flex items-center px-2 py-1 text-[11px] font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-lg border border-sky-200/80 transition"
+                                            title="Record Rent Payment for {{ tenant.tenant_name }}"
+                                        >
+                                            + Pay
+                                        </a>
+
+                                        <!-- Quick Record Expense -->
+                                        <a
+                                            href="{{ url_for('expenses', record_expense=1, tenant_id=tenant._id, room=tenant.room_no) }}"
+                                            class="inline-flex items-center px-2 py-1 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200/80 transition"
+                                            title="Record Expense for Room {{ tenant.room_no }}"
+                                        >
+                                            + Exp
+                                        </a>
+
+                                        <!-- Edit -->
+                                        <button
+                                            type="button"
+                                            class="btn-edit-tenant inline-flex items-center justify-center p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
+                                            data-id="{{ tenant._id }}"
+                                            data-room="{{ tenant.room_no|e }}"
+                                            data-tenant="{{ tenant.tenant_name|e }}"
+                                            data-contact="{{ (tenant.contact_number or '')|e }}"
+                                            data-email="{{ (tenant.email or '')|e }}"
+                                            data-rent="{{ tenant.monthly_rent or 0 }}"
+                                            data-movein="{{ (tenant.move_in_date or '')|e }}"
+                                            data-moveout="{{ (tenant.move_out_date or '')|e }}"
+                                            data-status="{{ status }}"
+                                            data-notes="{{ (tenant.notes or '')|e }}"
+                                            title="Edit Tenant"
+                                        >
+                                            <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                            </svg>
+                                        </button>
+
+                                        <!-- Move Out (active tenants only) -->
+                                        {% if status == 'Active' %}
+                                        <button
+                                            type="button"
+                                            class="btn-moveout-tenant inline-flex items-center justify-center p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                            data-id="{{ tenant._id }}"
+                                            data-room="{{ tenant.room_no|e }}"
+                                            data-tenant="{{ tenant.tenant_name|e }}"
+                                            title="Move Tenant Out"
+                                        >
+                                            <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                                            </svg>
+                                        </button>
+                                        {% endif %}
+
+                                        <!-- Delete -->
+                                        <button
+                                            type="button"
+                                            class="btn-delete-tenant inline-flex items-center justify-center p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                            data-id="{{ tenant._id }}"
+                                            data-room="{{ tenant.room_no|e }}"
+                                            data-tenant="{{ tenant.tenant_name|e }}"
+                                            title="Delete Tenant Record"
+                                        >
+                                            <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- No results matching filters -->
+            <div id="tenantNoMatch" class="hidden text-center py-12">
+                <svg class="w-12 h-12 mx-auto text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <p class="text-sm font-medium text-slate-700">No tenants match your filter</p>
+                <p class="text-xs text-slate-400 mt-1">Try a different search term or status filter</p>
+            </div>
+
+        {% else %}
+            <!-- Empty state -->
+            <div class="text-center py-16 px-4">
+                <div class="w-16 h-16 rounded-2xl bg-sky-50 border border-sky-100 text-sky-600 flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                </div>
+                <h3 class="text-base font-bold text-slate-800">No tenant records yet</h3>
+                <p class="text-sm text-slate-500 max-w-sm mx-auto mt-1 mb-6">
+                    Add your first tenant to keep track of who is staying in each room and their monthly rent.
+                </p>
+                <button type="button" onclick="openAddTenantModal()" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold rounded-xl shadow transition">
+                    Add First Tenant
+                </button>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: ADD TENANT                          -->
+<!-- ========================================== -->
+<div id="addTenantModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="add-tenant-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity" onclick="closeAddTenantModal()"></div>
+
+    <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+        <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-slate-200">
+            <div class="bg-gradient-to-r from-sky-600 to-indigo-600 px-6 py-4 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-base font-bold text-white tracking-tight" id="add-tenant-title">Add New Tenant</h3>
+                </div>
+                <button type="button" onclick="closeAddTenantModal()" class="text-white/80 hover:text-white rounded-lg p-1 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <form action="{{ url_for('add_tenant') }}" method="POST" class="p-6 space-y-4">
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="add_room_no" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Room No. <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="text" list="tenantRoomList" name="room_no" id="add_room_no" required placeholder="e.g. 2B"
+                            value="{{ selected_room or '' }}"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none uppercase font-semibold transition">
+                    </div>
+                    <div>
+                        <label for="add_tenant_name" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Tenant Name <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="text" name="tenant_name" id="add_tenant_name" required placeholder="e.g. Juan Dela Cruz"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none capitalize transition">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="add_contact_number" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Contact Number</label>
+                        <input type="text" name="contact_number" id="add_contact_number" placeholder="e.g. 0917 123 4567"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition">
+                    </div>
+                    <div>
+                        <label for="add_email" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Email (Optional)</label>
+                        <input type="email" name="email" id="add_email" placeholder="tenant@email.com"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="add_monthly_rent" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Monthly Rent (₱)</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-medium text-sm">₱</span>
+                            <input type="number" step="0.01" min="0" name="monthly_rent" id="add_monthly_rent" placeholder="0.00"
+                                class="w-full pl-8 pr-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none font-semibold transition">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="add_move_in_date" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Move In Date</label>
+                        <input type="date" name="move_in_date" id="add_move_in_date"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="add_status" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Status</label>
+                        <select name="status" id="add_status"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none font-medium transition">
+                            <option value="Active" selected>Active</option>
+                            <option value="Moved Out">Moved Out</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="add_move_out_date" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Move Out Date (if ended)</label>
+                        <input type="date" name="move_out_date" id="add_move_out_date"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="add_notes" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Notes (Optional)</label>
+                    <input type="text" name="notes" id="add_notes" placeholder="e.g. 1-year contract, 2 months deposit"
+                        class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition">
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-3">
+                    <button type="button" onclick="closeAddTenantModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition">Cancel</button>
+                    <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 active:bg-sky-800 rounded-xl shadow-xs hover:shadow transition focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">Save Tenant</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: EDIT TENANT                         -->
+<!-- ========================================== -->
+<div id="editTenantModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="edit-tenant-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity" onclick="closeEditTenantModal()"></div>
+
+    <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+        <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-slate-200">
+            <div class="bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-4 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-base font-bold text-white tracking-tight" id="edit-tenant-title">Update Tenant Record</h3>
+                </div>
+                <button type="button" onclick="closeEditTenantModal()" class="text-white/80 hover:text-white rounded-lg p-1 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <form id="editTenantForm" method="POST" action="{{ url_for('tenants') }}" class="p-6 space-y-4">
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="edit_room_no" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Room No. <span class="text-rose-500">*</span></label>
+                        <input type="text" list="tenantRoomList" name="room_no" id="edit_room_no" required
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none uppercase font-semibold transition">
+                    </div>
+                    <div>
+                        <label for="edit_tenant_name" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Tenant Name <span class="text-rose-500">*</span></label>
+                        <input type="text" name="tenant_name" id="edit_tenant_name" required
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none capitalize transition">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="edit_contact_number" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Contact Number</label>
+                        <input type="text" name="contact_number" id="edit_contact_number"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition">
+                    </div>
+                    <div>
+                        <label for="edit_email" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Email (Optional)</label>
+                        <input type="email" name="email" id="edit_email"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="edit_monthly_rent" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Monthly Rent (₱)</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-medium text-sm">₱</span>
+                            <input type="number" step="0.01" min="0" name="monthly_rent" id="edit_monthly_rent"
+                                class="w-full pl-8 pr-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-semibold transition">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="edit_move_in_date" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Move In Date</label>
+                        <input type="date" name="move_in_date" id="edit_move_in_date"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="edit_status" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Status</label>
+                        <select name="status" id="edit_status"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-medium transition">
+                            <option value="Active">Active</option>
+                            <option value="Moved Out">Moved Out</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="edit_move_out_date" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Move Out Date</label>
+                        <input type="date" name="move_out_date" id="edit_move_out_date"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="edit_notes" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Notes (Optional)</label>
+                    <input type="text" name="notes" id="edit_notes"
+                        class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition">
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-3">
+                    <button type="button" onclick="closeEditTenantModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition">Cancel</button>
+                    <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 active:bg-amber-800 rounded-xl shadow-xs hover:shadow transition focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2">Update Tenant</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: MOVE OUT TENANT                     -->
+<!-- ========================================== -->
+<div id="moveOutModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="moveout-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity" onclick="closeMoveOutModal()"></div>
+
+    <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+        <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md border border-slate-200 p-6 space-y-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900" id="moveout-title">Move Tenant Out</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">The room becomes available again.</p>
+                </div>
+            </div>
+
+            <p class="text-sm text-slate-600">
+                End the stay of <span id="moveOutTenantName" class="font-bold text-slate-900"></span>
+                in <span id="moveOutRoomNo" class="font-bold text-slate-900"></span>.
+            </p>
+
+            <form id="moveOutForm" method="POST" action="{{ url_for('tenants') }}" class="space-y-4">
+                
+                <div>
+                    <label for="move_out_date" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Move Out Date</label>
+                    <input type="date" name="move_out_date" id="move_out_date"
+                        class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition">
+                </div>
+
+                <div class="pt-2 flex items-center justify-end space-x-3">
+                    <button type="button" onclick="closeMoveOutModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition">Cancel</button>
+                    <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 active:bg-amber-800 rounded-xl shadow-xs hover:shadow transition focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2">Confirm Move Out</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: DELETE TENANT                       -->
+<!-- ========================================== -->
+<div id="deleteTenantModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="delete-tenant-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity" onclick="closeDeleteTenantModal()"></div>
+
+    <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+        <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md border border-slate-200 p-6 space-y-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900" id="delete-tenant-title">Delete Tenant Record</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">This permanently removes the tenant from the directory.</p>
+                </div>
+            </div>
+
+            <p class="text-sm text-slate-600">
+                Are you sure you want to delete <span id="deleteTenantName" class="font-bold text-slate-900"></span>
+                in <span id="deleteTenantRoom" class="font-bold text-slate-900"></span>?
+                <span class="block mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    Tip: use <strong>Move Out</strong> instead if you want to keep this tenant's history.
+                </span>
+            </p>
+
+            <form id="deleteTenantForm" method="POST" action="{{ url_for('tenants') }}" class="pt-2 flex items-center justify-end space-x-3">
+                
+                <button type="button" onclick="closeDeleteTenantModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition">Cancel</button>
+                <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-xl shadow-xs hover:shadow transition focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2">Delete Tenant</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let tenantStatusFilter = 'all';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Default dates
+        const today = new Date().toISOString().split('T')[0];
+        const addMoveIn = document.getElementById('add_move_in_date');
+        if (addMoveIn && !addMoveIn.value) addMoveIn.value = today;
+        const moveOutDate = document.getElementById('move_out_date');
+        if (moveOutDate && !moveOutDate.value) moveOutDate.value = today;
+
+        // Status filter tabs
+        document.querySelectorAll('.status-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                tenantStatusFilter = tab.dataset.statusFilter;
+                document.querySelectorAll('.status-tab').forEach(t => {
+                    t.classList.remove('bg-white', 'text-sky-700', 'shadow-xs');
+                    t.classList.add('text-slate-600');
+                });
+                tab.classList.add('bg-white', 'text-sky-700', 'shadow-xs');
+                tab.classList.remove('text-slate-600');
+                filterTenantsTable();
+            });
+        });
+
+        // Delegated action buttons
+        document.addEventListener('click', (e) => {
+            const editBtn = e.target.closest('.btn-edit-tenant');
+            if (editBtn) {
+                const d = editBtn.dataset;
+                openEditTenantModal(d.id, d.room, d.tenant, d.contact, d.email, d.rent, d.movein, d.moveout, d.status, d.notes);
+                return;
+            }
+
+            const moveOutBtn = e.target.closest('.btn-moveout-tenant');
+            if (moveOutBtn) {
+                const d = moveOutBtn.dataset;
+                openMoveOutModal(d.id, d.tenant, d.room);
+                return;
+            }
+
+            const deleteBtn = e.target.closest('.btn-delete-tenant');
+            if (deleteBtn) {
+                const d = deleteBtn.dataset;
+                openDeleteTenantModal(d.id, d.tenant, d.room);
+                return;
+            }
+        });
+    });
+
+    function handleTenantRoomFilter(roomValue) {
+        if (roomValue) {
+            window.location.href = "{{ url_for('tenants') }}?room=" + encodeURIComponent(roomValue);
+        } else {
+            window.location.href = "{{ url_for('tenants') }}";
+        }
+    }
+
+    // Add tenant
+    function openAddTenantModal() {
+        document.getElementById('addTenantModal').classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+        setTimeout(() => document.getElementById('add_room_no').focus(), 50);
+    }
+    function closeAddTenantModal() {
+        document.getElementById('addTenantModal').classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+
+    // Edit tenant
+    function openEditTenantModal(id, room, tenant, contact, email, rent, moveIn, moveOut, status, notes) {
+        const form = document.getElementById('editTenantForm');
+        form.action = "{{ url_for('edit_tenant', tenant_id='__ID__') }}".replace('__ID__', id);
+
+        document.getElementById('edit_room_no').value = room || '';
+        document.getElementById('edit_tenant_name').value = tenant || '';
+        document.getElementById('edit_contact_number').value = contact || '';
+        document.getElementById('edit_email').value = email || '';
+        document.getElementById('edit_monthly_rent').value = rent || '';
+        document.getElementById('edit_move_in_date').value = moveIn || '';
+        document.getElementById('edit_move_out_date').value = moveOut || '';
+        document.getElementById('edit_status').value = status || 'Active';
+        document.getElementById('edit_notes').value = notes || '';
+
+        document.getElementById('editTenantModal').classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    }
+    function closeEditTenantModal() {
+        document.getElementById('editTenantModal').classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+
+    // Move out
+    function openMoveOutModal(id, tenant, room) {
+        document.getElementById('moveOutTenantName').textContent = tenant;
+        document.getElementById('moveOutRoomNo').textContent = 'Room ' + room;
+        document.getElementById('moveOutForm').action = "{{ url_for('move_out_tenant', tenant_id='__ID__') }}".replace('__ID__', id);
+        document.getElementById('move_out_date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('moveOutModal').classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    }
+    function closeMoveOutModal() {
+        document.getElementById('moveOutModal').classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+
+    // Delete
+    function openDeleteTenantModal(id, tenant, room) {
+        document.getElementById('deleteTenantName').textContent = tenant;
+        document.getElementById('deleteTenantRoom').textContent = 'Room ' + room;
+        document.getElementById('deleteTenantForm').action = "{{ url_for('delete_tenant', tenant_id='__ID__') }}".replace('__ID__', id);
+        document.getElementById('deleteTenantModal').classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    }
+    function closeDeleteTenantModal() {
+        document.getElementById('deleteTenantModal').classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+
+    // Search + status filter
+    function filterTenantsTable() {
+        const query = (document.getElementById('tenantSearchInput')?.value || '').toLowerCase().trim();
+        const rows = document.querySelectorAll('.tenant-row');
+        let visibleCount = 0;
+
+        rows.forEach(row => {
+            const matchesSearch = row.textContent.toLowerCase().includes(query);
+            const matchesStatus = tenantStatusFilter === 'all' || row.dataset.status === tenantStatusFilter;
+            if (matchesSearch && matchesStatus) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        const noMatch = document.getElementById('tenantNoMatch');
+        if (noMatch) noMatch.classList.toggle('hidden', !(visibleCount === 0 && rows.length > 0));
+
+        const badge = document.getElementById('tenantCountBadge');
+        if (badge) badge.textContent = visibleCount + ' records';
+    }
+
+    // Escape closes everything
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeAddTenantModal();
+            closeEditTenantModal();
+            closeMoveOutModal();
+            closeDeleteTenantModal();
+        }
+    });
+</script>
+{% endblock %}

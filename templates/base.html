@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>{% block title %}JFJ Renthouse Management System{% endblock %}</title>
+
+    <!-- Google Font: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Chart.js for Interactive Visual Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+    <!-- Compiled Tailwind CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
+
+    <!-- Tailwind CDN fallback for dynamic compilation/preview reliability -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            200: '#bae0fd',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen font-sans antialiased selection:bg-sky-500 selection:text-white">
+
+{% macro nav_item(endpoint_name, href, label, icon_path) %}
+<a href="{{ href }}"
+   class="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors
+          {% if request.endpoint == endpoint_name %}bg-sky-50 text-sky-700{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
+    <span class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0
+                 {% if request.endpoint == endpoint_name %}bg-sky-100 text-sky-600{% else %}bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-slate-700{% endif %}">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ icon_path }}"/>
+        </svg>
+    </span>
+    <span class="flex-1">{{ label }}</span>
+    {% if request.endpoint == endpoint_name %}
+        <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+    {% endif %}
+</a>
+{% endmacro %}
+
+    <!-- ========================================== -->
+    <!-- DESKTOP SIDEBAR                            -->
+    <!-- ========================================== -->
+    <aside class="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:w-64 bg-white border-r border-slate-200 z-40">
+
+        <!-- Brand -->
+        <div class="h-16 flex items-center px-5 border-b border-slate-100 shrink-0">
+            <a href="{{ url_for('dashboard') }}" class="flex items-center space-x-3 group min-w-0">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20 group-hover:scale-105 transition-transform shrink-0">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                </div>
+                <div class="min-w-0">
+                    <div class="flex items-center space-x-2">
+                        <span class="font-extrabold text-slate-900 text-base tracking-tight group-hover:text-sky-600 transition-colors truncate">JFJ Renthouse</span>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 shrink-0">PRO</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 font-medium truncate">Rental &amp; Financial Ledger</p>
+                </div>
+            </a>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 overflow-y-auto px-3 py-5 space-y-1">
+            <p class="px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Menu</p>
+
+            {{ nav_item('dashboard', url_for('dashboard'), 'Dashboard', 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6') }}
+
+            {{ nav_item('tenants', url_for('tenants'), 'Tenants', 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z') }}
+
+            {{ nav_item('analytics', url_for('analytics'), 'Analytics & KPIs', 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z') }}
+
+            {{ nav_item('expenses', url_for('expenses'), 'Expenses', 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z') }}
+
+            {{ nav_item('history', url_for('history'), 'Activity History', 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z') }}
+
+            {{ nav_item('data_tools', url_for('data_tools'), 'Import / Export', 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4') }}
+        </nav>
+
+        <!-- Sidebar Footer -->
+        <div class="p-3 border-t border-slate-100 space-y-2 shrink-0">
+            <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>Atlas DB Active</span>
+            </div>
+
+            <div class="flex items-center px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500 font-medium">
+                <svg class="w-4 h-4 mr-1.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                <span id="headerCurrentDate"></span>
+            </div>
+
+            <!-- Signed-in admin + sign out -->
+            <div class="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[9px] font-bold uppercase tracking-widest text-slate-400 leading-none">Signed in</p>
+                    <p class="text-xs font-bold text-slate-800 truncate mt-0.5">{{ session.get('admin_username', 'Admin') }}</p>
+                </div>
+                <form method="POST" action="{{ url_for('logout') }}" class="shrink-0">
+                    
+                    <button type="submit" title="Sign out" aria-label="Sign out"
+                        class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                        </svg>
+                    </button>
+                </form>
+            </div>
+
+            <p class="px-3 pt-1 text-[10px] text-slate-400 font-medium">Version 3.2 &bull; Secure Admin</p>
+        </div>
+    </aside>
+
+    <!-- ========================================== -->
+    <!-- MOBILE TOP BAR                             -->
+    <!-- ========================================== -->
+    <div class="lg:hidden sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
+        <div class="h-16 px-4 flex items-center justify-between">
+            <button type="button" onclick="openMobileSidebar()" aria-label="Open navigation menu"
+                class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+
+            <a href="{{ url_for('dashboard') }}" class="flex items-center space-x-2.5">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white shadow-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                </div>
+                <span class="font-extrabold text-slate-900 text-sm tracking-tight">JFJ Renthouse</span>
+            </a>
+
+            <div class="w-9 h-9 flex items-center justify-center">
+                <span class="relative flex h-2.5 w-2.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MOBILE SLIDE-OUT SIDEBAR                   -->
+    <!-- ========================================== -->
+    <div id="mobileSidebar" class="fixed inset-0 z-50 hidden lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
+        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeMobileSidebar()"></div>
+
+        <aside id="mobileSidebarPanel"
+            class="absolute inset-y-0 left-0 w-72 max-w-[85%] bg-white shadow-2xl flex flex-col -translate-x-full transition-transform duration-300 ease-out">
+
+            <div class="h-16 flex items-center justify-between px-4 border-b border-slate-100 shrink-0">
+                <a href="{{ url_for('dashboard') }}" class="flex items-center space-x-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white shadow-sm">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-extrabold text-slate-900 text-sm tracking-tight">JFJ Renthouse</span>
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-50 text-sky-700 border border-sky-200">PRO</span>
+                        </div>
+                        <p class="text-[10px] text-slate-500 font-medium">Rental &amp; Financial Ledger</p>
+                    </div>
+                </a>
+
+                <button type="button" onclick="closeMobileSidebar()" aria-label="Close navigation menu"
+                    class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <nav class="flex-1 overflow-y-auto px-3 py-5 space-y-1">
+                <p class="px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Menu</p>
+
+                {{ nav_item('dashboard', url_for('dashboard'), 'Dashboard', 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6') }}
+
+                {{ nav_item('tenants', url_for('tenants'), 'Tenants', 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z') }}
+
+                {{ nav_item('analytics', url_for('analytics'), 'Analytics & KPIs', 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z') }}
+
+                {{ nav_item('expenses', url_for('expenses'), 'Expenses', 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z') }}
+
+                {{ nav_item('history', url_for('history'), 'Activity History', 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z') }}
+
+                {{ nav_item('data_tools', url_for('data_tools'), 'Import / Export', 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4') }}
+            </nav>
+
+            <div class="p-3 border-t border-slate-100 space-y-2 shrink-0">
+                <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
+                    <span class="relative flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span>Atlas DB Active</span>
+                </div>
+
+                <!-- Signed-in admin + sign out -->
+                <div class="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[9px] font-bold uppercase tracking-widest text-slate-400 leading-none">Signed in</p>
+                        <p class="text-xs font-bold text-slate-800 truncate mt-0.5">{{ session.get('admin_username', 'Admin') }}</p>
+                    </div>
+                    <form method="POST" action="{{ url_for('logout') }}" class="shrink-0">
+                        
+                        <button type="submit" title="Sign out" aria-label="Sign out"
+                            class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                            </svg>
+                        </button>
+                    </form>
+                </div>
+
+                <p class="px-3 pt-1 text-[10px] text-slate-400 font-medium">Version 3.2 &bull; Secure Admin</p>
+            </div>
+        </aside>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PAGE CONTENT                               -->
+    <!-- ========================================== -->
+    <div class="lg:pl-64 flex flex-col min-h-screen">
+
+        <main class="flex-1 w-full px-4 sm:px-6 lg:px-8 py-6">
+            <div class="max-w-7xl mx-auto w-full">
+
+                <!-- Flash Notifications -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="space-y-3 mb-5" id="flash-container">
+                            {% for category, message in messages %}
+                                <div class="flash-alert flex items-start justify-between p-4 rounded-2xl shadow-xs border transition-all animate-fade-in
+                                    {% if category == 'success' %}
+                                        bg-emerald-50 border-emerald-200 text-emerald-800
+                                    {% elif category in ['danger', 'error'] %}
+                                        bg-rose-50 border-rose-200 text-rose-800
+                                    {% elif category == 'warning' %}
+                                        bg-amber-50 border-amber-200 text-amber-800
+                                    {% else %}
+                                        bg-sky-50 border-sky-200 text-sky-800
+                                    {% endif %}
+                                " role="alert">
+                                    <div class="flex items-center space-x-3">
+                                        {% if category == 'success' %}
+                                            <div class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </div>
+                                        {% elif category in ['danger', 'error'] %}
+                                            <div class="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </div>
+                                        {% elif category == 'warning' %}
+                                            <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                            </div>
+                                        {% else %}
+                                            <div class="w-8 h-8 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </div>
+                                        {% endif %}
+                                        <div>
+                                            <h4 class="text-xs font-bold uppercase tracking-wider
+                                                {% if category == 'success' %}text-emerald-700
+                                                {% elif category in ['danger', 'error'] %}text-rose-700
+                                                {% elif category == 'warning' %}text-amber-700
+                                                {% else %}text-sky-700{% endif %}">
+                                                {{ category|capitalize }} Notification
+                                            </h4>
+                                            <p class="text-sm font-medium">{{ message }}</p>
+                                        </div>
+                                    </div>
+                                    <button type="button" onclick="this.closest('.flash-alert').remove()" class="text-slate-400 hover:text-slate-600 rounded-lg p-1.5 transition-colors">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="border-t border-slate-200 bg-white py-5">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+                <div class="flex items-center space-x-2">
+                    <span class="font-bold text-slate-800">JFJ Renthouse Ledger</span>
+                    <span>&bull;</span>
+                    <span>Version 3.2 (Secure Admin, Activity History &amp; Sheets)</span>
+                </div>
+                <div>Built with Flask, Tailwind CSS &amp; MongoDB Atlas</div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Global Scripts -->
+    <script>
+        // Mobile sidebar drawer controls
+        function openMobileSidebar() {
+            const overlay = document.getElementById('mobileSidebar');
+            const panel = document.getElementById('mobileSidebarPanel');
+            overlay.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+            requestAnimationFrame(() => {
+                panel.classList.remove('-translate-x-full');
+                panel.classList.add('translate-x-0');
+            });
+        }
+
+        function closeMobileSidebar() {
+            const overlay = document.getElementById('mobileSidebar');
+            const panel = document.getElementById('mobileSidebarPanel');
+            panel.classList.remove('translate-x-0');
+            panel.classList.add('-translate-x-full');
+            document.body.classList.remove('overflow-hidden');
+            setTimeout(() => overlay.classList.add('hidden'), 250);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Dynamic formatted date in the sidebar
+            const dateElem = document.getElementById('headerCurrentDate');
+            if (dateElem) {
+                const now = new Date();
+                const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+                dateElem.textContent = now.toLocaleDateString('en-US', options);
+            }
+
+            // Close the mobile drawer if the viewport becomes desktop-sized
+            window.addEventListener('resize', () => {
+                if (window.innerWidth >= 1024) {
+                    const overlay = document.getElementById('mobileSidebar');
+                    if (overlay && !overlay.classList.contains('hidden')) {
+                        overlay.classList.add('hidden');
+                        document.getElementById('mobileSidebarPanel').classList.add('-translate-x-full');
+                        document.body.classList.remove('overflow-hidden');
+                    }
+                }
+            });
+
+            // Auto dismiss flash messages after 6 seconds
+            setTimeout(() => {
+                const flashAlerts = document.querySelectorAll('.flash-alert');
+                flashAlerts.forEach(alert => {
+                    alert.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-10px)';
+                    setTimeout(() => alert.remove(), 400);
+                });
+            }, 6000);
+        });
+
+        // Escape closes the mobile drawer
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const overlay = document.getElementById('mobileSidebar');
+                if (overlay && !overlay.classList.contains('hidden')) closeMobileSidebar();
+            }
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

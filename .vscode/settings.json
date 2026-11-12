@@ -1,0 +1,11 @@
+{
+  "css.lint.unknownAtRules": "ignore",
+  "css.lint.vendorPrefix": "ignore",
+  "css.lint.compatibleVendorPrefixes": "ignore",
+  "css.lint.unknownVendorSpecificProperties": "ignore",
+  "css.lint.duplicateProperties": "ignore",
+  "css.lint.propertyIgnoredDueToDisplay": "ignore",
+  "editor.maxTokenizationLineLength": 200000,
+  "html.validate.styles": false,
+  "html.validate.scripts": false
+}

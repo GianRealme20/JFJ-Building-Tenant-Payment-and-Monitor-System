@@ -1,0 +1,1203 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | JFJ Renthouse System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Shared Rooms Datalist for Auto-complete -->
+    <datalist id="existingRooms">
+        {% for room in rooms %}
+            <option value="{{ room }}"></option>
+        {% endfor %}
+    </datalist>
+
+    <!-- Page Header & Quick Controls -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-1">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Rental Ledger &amp; Dashboard</h1>
+            <p class="text-sm text-slate-500 mt-1 flex items-center flex-wrap gap-2">
+                <span>Manage tenant rent payments, dues, and payment methods.</span>
+                {% if selected_room %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 border border-sky-200">
+                        Room Filter: {{ selected_room }}
+                    </span>
+                {% endif %}
+            </p>
+        </div>
+        <div class="flex items-center gap-2.5">
+            <a href="{{ url_for('analytics') }}" class="inline-flex items-center px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl border border-slate-200 shadow-xs hover:shadow transition">
+                <svg class="w-4 h-4 mr-2 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+                View Analytics
+            </a>
+            <button type="button" onclick="openAddPaymentModal()" class="inline-flex items-center px-4 py-2.5 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white text-sm font-semibold rounded-xl shadow-xs hover:shadow transition focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Record Payment
+            </button>
+        </div>
+    </div>
+
+    <!-- Top Statistics KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        
+        <!-- Card 1: Total Collected (Gross Revenue) -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold tracking-wider text-slate-500 uppercase">Gross Revenue</span>
+                <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="text-2xl font-extrabold text-slate-900 tracking-tight">₱{{ "{:,.2f}".format(total_paid or 0) }}</div>
+                <div class="flex items-center justify-between text-xs mt-1.5">
+                    <span class="text-slate-500 font-medium">Expected Due: ₱{{ "{:,.2f}".format(total_due or 0) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2: Collection Rate & Delinquency -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold tracking-wider text-slate-500 uppercase">Collection Rate</span>
+                <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="text-2xl font-extrabold text-sky-600 tracking-tight">{{ collection_rate }}%</div>
+                <div class="w-full bg-slate-100 rounded-full h-1.5 mt-2 overflow-hidden">
+                    <div id="collectionRateBar" class="bg-sky-600 h-1.5 rounded-full transition-all duration-500 w-0" data-rate="{{ [collection_rate, 100]|min }}"></div>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-1">Efficiency of rent recovery</p>
+            </div>
+        </div>
+
+        <!-- Card 3: Total Pending Balance -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold tracking-wider text-slate-500 uppercase">Pending Balance</span>
+                <div class="w-10 h-10 rounded-xl {% if total_balance and total_balance > 0 %}bg-rose-50 text-rose-600{% else %}bg-slate-50 text-slate-500{% endif %} flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="text-2xl font-extrabold {% if total_balance and total_balance > 0 %}text-rose-600{% else %}text-slate-900{% endif %} tracking-tight">
+                    ₱{{ "{:,.2f}".format(total_balance or 0) }}
+                </div>
+                <p class="text-xs {% if total_balance and total_balance > 0 %}text-rose-500{% else %}text-slate-400{% endif %} font-medium mt-1 flex items-center">
+                    <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Outstanding collectibles
+                </p>
+            </div>
+        </div>
+
+        <!-- Card 4: Net Profit (Revenue - Operating Expenses) -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold tracking-wider text-slate-500 uppercase">Net Profit</span>
+                <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="text-2xl font-extrabold {% if net_profit >= 0 %}text-indigo-600{% else %}text-rose-600{% endif %} tracking-tight">
+                    ₱{{ "{:,.2f}".format(net_profit or 0) }}
+                </div>
+                <p class="text-xs text-slate-500 font-medium mt-1 flex items-center justify-between">
+                    <span>Expenses: ₱{{ "{:,.2f}".format(total_expenses or 0) }}</span>
+                    <a href="{{ url_for('expenses') }}" class="text-sky-600 hover:underline text-[11px] font-semibold">Ledger &rarr;</a>
+                </p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+        <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+
+            <!-- Left: Search Box -->
+            <div class="relative flex-1 max-w-md">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+                <input
+                    type="text"
+                    id="tableSearchInput"
+                    placeholder="Search tenant name, room no, method, status..."
+                    class="block w-full pl-10 pr-4 py-2 text-sm bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition outline-none"
+                    onkeyup="filterPaymentsTable()"
+                >
+            </div>
+
+            <!-- Right: Room Filter Dropdown -->
+            <div class="flex flex-wrap items-center gap-2">
+                <label for="roomSelect" class="text-xs font-semibold text-slate-600 uppercase tracking-wider hidden sm:inline">
+                    Filter Room:
+                </label>
+                <div class="relative min-w-[150px]">
+                    <select
+                        id="roomSelect"
+                        onchange="handleRoomFilter(this.value)"
+                        class="w-full appearance-none bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 text-slate-800 text-sm rounded-xl py-2 pl-3.5 pr-8 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none font-medium cursor-pointer transition"
+                    >
+                        <option value="" {% if not selected_room %}selected{% endif %}>All Rooms</option>
+                        {% for room in rooms %}
+                            <option value="{{ room }}" {% if selected_room == room %}selected{% endif %}>
+                                Room {{ room }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </div>
+                </div>
+
+                {% if selected_room %}
+                    <a href="{{ url_for('dashboard') }}" class="inline-flex items-center px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
+                        <svg class="w-3.5 h-3.5 mr-1 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        Clear Filter
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Payments Ledger Table -->
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center space-x-2">
+                <h2 class="text-base font-bold text-slate-900">Payment Transactions</h2>
+                <span id="recordCountBadge" class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                    {{ payments|length }} entries
+                </span>
+            </div>
+            <div class="text-xs text-slate-500 flex items-center space-x-2">
+                <span>Showing latest transactions first</span>
+            </div>
+        </div>
+
+        {% if payments and payments|length > 0 %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm" id="paymentsTable">
+                    <thead>
+                        <tr class="bg-slate-50/75 border-b border-slate-200/80 text-xs uppercase font-semibold text-slate-500 tracking-wider">
+                            <th scope="col" class="py-3.5 px-5">Room</th>
+                            <th scope="col" class="py-3.5 px-5">Tenant Name</th>
+                            <th scope="col" class="py-3.5 px-4">Date</th>
+                            <th scope="col" class="py-3.5 px-4 text-right">Due</th>
+                            <th scope="col" class="py-3.5 px-4 text-right">Paid</th>
+                            <th scope="col" class="py-3.5 px-4 text-right">Balance</th>
+                            <th scope="col" class="py-3.5 px-4 text-center">Method</th>
+                            <th scope="col" class="py-3.5 px-4 text-center">Status</th>
+                            <th scope="col" class="py-3.5 px-4 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 font-normal">
+                        {% for payment in payments %}
+                            <tr class="hover:bg-slate-50/70 transition-colors payment-row">
+                                <!-- Room No -->
+                                <td class="py-4 px-5 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200/70">
+                                        {{ payment.room_no }}
+                                    </span>
+                                </td>
+
+                                <!-- Tenant Name -->
+                                <td class="py-4 px-5 whitespace-nowrap">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 font-bold text-xs uppercase">
+                                            {{ (payment.tenant_name|string)[:2] }}
+                                        </div>
+                                        <div>
+                                            <span class="font-semibold text-slate-900 block tenant-name-cell">
+                                                {{ payment.tenant_name }}
+                                            </span>
+                                            <span class="text-[11px] text-slate-400">
+                                                {{ payment.category or 'Rent' }}
+                                                {% if payment.notes %} &bull; <span class="italic text-slate-500">{{ payment.notes }}</span>{% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <!-- Date -->
+                                <td class="py-4 px-4 whitespace-nowrap text-slate-600">
+                                    <div class="flex items-center text-xs">
+                                        <svg class="w-3.5 h-3.5 mr-1 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                        </svg>
+                                        {{ payment.date }}
+                                    </div>
+                                </td>
+
+                                <!-- Due -->
+                                <td class="py-4 px-4 whitespace-nowrap text-right font-medium text-slate-600">
+                                    ₱{{ "{:,.2f}".format(payment.payment_due|float) if payment.payment_due is not none else "0.00" }}
+                                </td>
+
+                                <!-- Amount Paid -->
+                                <td class="py-4 px-4 whitespace-nowrap text-right font-bold text-emerald-600">
+                                    ₱{{ "{:,.2f}".format(payment.amount_paid|float) if payment.amount_paid is not none else "0.00" }}
+                                </td>
+
+                                <!-- Balance -->
+                                <td class="py-4 px-4 whitespace-nowrap text-right font-semibold">
+                                    {% if payment.balance and payment.balance|float > 0 %}
+                                        <span class="text-rose-600 font-bold">
+                                            ₱{{ "{:,.2f}".format(payment.balance|float) }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-slate-400 font-medium">₱0.00</span>
+                                    {% endif %}
+                                </td>
+
+                                <!-- Payment Method -->
+                                <td class="py-4 px-4 whitespace-nowrap text-center">
+                                    {% set method = payment.payment_method or 'Cash' %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold 
+                                        {% if method == 'Cash' %}bg-slate-100 text-slate-700 border border-slate-200
+                                        {% elif method == 'GCash' %}bg-blue-50 text-blue-700 border border-blue-200
+                                        {% elif method == 'Maya' %}bg-emerald-50 text-emerald-700 border border-emerald-200
+                                        {% elif method == 'Bank Transfer' %}bg-purple-50 text-purple-700 border border-purple-200
+                                        {% else %}bg-indigo-50 text-indigo-700 border border-indigo-200{% endif %}">
+                                        {{ method }}
+                                    </span>
+                                </td>
+
+                                <!-- Status Badge -->
+                                <td class="py-4 px-4 whitespace-nowrap text-center">
+                                    {% if payment.status == 'Paid' or (payment.balance|float == 0) %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            <svg class="w-2.5 h-2.5 mr-1 text-emerald-500" fill="currentColor" viewBox="0 0 8 8">
+                                                <circle cx="4" cy="4" r="3"/>
+                                            </svg>
+                                            Paid
+                                        </span>
+                                    {% else %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                            <svg class="w-2.5 h-2.5 mr-1 text-amber-500" fill="currentColor" viewBox="0 0 8 8">
+                                                <circle cx="4" cy="4" r="3"/>
+                                            </svg>
+                                            Pending
+                                        </span>
+                                    {% endif %}
+                                </td>
+
+                                <!-- Action Buttons (Edit + Delete via Data Attributes) -->
+                                <td class="py-4 px-4 whitespace-nowrap text-center">
+                                    <div class="inline-flex items-center space-x-1">
+                                        <!-- Edit Button -->
+                                        <button
+                                            type="button"
+                                            class="btn-edit-payment inline-flex items-center justify-center p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
+                                            data-id="{{ payment._id }}"
+                                            data-tenant-id="{{ payment.tenant_id or '' }}"
+                                            data-room="{{ payment.room_no }}"
+                                            data-tenant="{{ payment.tenant_name }}"
+                                            data-due="{{ payment.payment_due }}"
+                                            data-paid="{{ payment.amount_paid }}"
+                                            data-date="{{ payment.date }}"
+                                            data-method="{{ payment.payment_method or 'Cash' }}"
+                                            data-category="{{ payment.category or 'Rent' }}"
+                                            data-notes="{{ payment.notes or '' }}"
+                                            title="Edit Record"
+                                        >
+                                            <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                            </svg>
+                                        </button>
+
+                                        <!-- Delete Button -->
+                                        <button
+                                            type="button"
+                                            class="btn-delete-payment inline-flex items-center justify-center p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                            data-id="{{ payment._id }}"
+                                            data-tenant="{{ payment.tenant_name }}"
+                                            data-room="{{ payment.room_no }}"
+                                            title="Delete Record"
+                                        >
+                                            <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- No results matching search row -->
+            <div id="noMatchMessage" class="hidden text-center py-12">
+                <svg class="w-12 h-12 mx-auto text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <p class="text-sm font-medium text-slate-700">No payment records match your search filter</p>
+                <p class="text-xs text-slate-400 mt-1">Try adjusting the search query or room filter</p>
+            </div>
+
+        {% else %}
+            <!-- Empty State when table has no data -->
+            <div class="text-center py-16 px-4">
+                <div class="w-16 h-16 rounded-2xl bg-sky-50 border border-sky-100 text-sky-600 flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                </div>
+                <h3 class="text-base font-bold text-slate-800">No payment records found</h3>
+                <p class="text-sm text-slate-500 max-w-sm mx-auto mt-1 mb-6">
+                    {% if selected_room %}
+                        There are currently no records for Room <span class="font-semibold">{{ selected_room }}</span>.
+                    {% else %}
+                        Start managing your property by adding the first rental payment.
+                    {% endif %}
+                </p>
+                <div class="flex items-center justify-center gap-3">
+                    {% if selected_room %}
+                        <a href="{{ url_for('dashboard') }}" class="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-semibold rounded-xl transition">
+                            View All Rooms
+                        </a>
+                    {% endif %}
+                    <button type="button" onclick="openAddPaymentModal()" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold rounded-xl shadow transition">
+                        Add New Payment
+                    </button>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: ADD PAYMENT RECORD                  -->
+<!-- ========================================== -->
+<div id="addPaymentModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity" onclick="closeAddPaymentModal()"></div>
+
+    <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+        <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-slate-200">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-sky-600 to-indigo-600 px-6 py-4 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-base font-bold text-white tracking-tight" id="modal-title">Record Rent Payment</h3>
+                </div>
+                <button type="button" onclick="closeAddPaymentModal()" class="text-white/80 hover:text-white rounded-lg p-1 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Modal Form -->
+            <form action="{{ url_for('add_payment') }}" method="POST" id="addPaymentForm" class="p-6 space-y-4">
+                
+                <input type="hidden" name="tenant_id" id="modal_tenant_id" value="">
+
+                <!-- Select Existing Tenant Quick-fill -->
+                <div>
+                    <label for="modal_tenant_select" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Select Existing Tenant <span class="text-[11px] font-normal text-slate-400 lowercase">(auto-fills room, tenant &amp; rent)</span>
+                    </label>
+                    <select
+                        id="modal_tenant_select"
+                        class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition font-medium text-slate-700"
+                    >
+                        <option value="">-- Choose active tenant (or enter manually below) --</option>
+                        {% for opt in tenant_options %}
+                            <option
+                                value="{{ opt.id }}"
+                                data-name="{{ opt.name }}"
+                                data-room="{{ opt.room_no }}"
+                                data-rent="{{ opt.rent }}"
+                                data-status="{{ opt.status }}"
+                            >
+                                {{ opt.name }} · Room {{ opt.room_no }} (₱{{ '{:,.2f}'.format(opt.rent) }}){% if opt.status == 'Moved Out' %} [Moved Out]{% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Room Number Field -->
+                    <div>
+                        <label for="modal_room_no" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Room No. <span class="text-rose-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            list="existingRooms"
+                            name="room_no"
+                            id="modal_room_no"
+                            required
+                            placeholder="e.g. 2B or 3A"
+                            value="{{ selected_room or '' }}"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none uppercase font-semibold transition"
+                        >
+                    </div>
+
+                    <!-- Tenant Name Field -->
+                    <div>
+                        <label for="modal_tenant_name" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Tenant Name <span class="text-rose-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            name="tenant_name"
+                            id="modal_tenant_name"
+                            required
+                            placeholder="e.g. Toledo"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none capitalize transition"
+                        >
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Payment Due -->
+                    <div>
+                        <label for="modal_payment_due" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Payment Due (₱) <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-medium text-sm">₱</span>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                name="payment_due"
+                                id="modal_payment_due"
+                                required
+                                placeholder="0.00"
+                                oninput="calculateBalancePreview('add')"
+                                class="w-full pl-8 pr-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none font-semibold transition"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Amount Paid -->
+                    <div>
+                        <label for="modal_amount_paid" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Amount Paid (₱) <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-medium text-sm">₱</span>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                name="amount_paid"
+                                id="modal_amount_paid"
+                                required
+                                placeholder="0.00"
+                                oninput="calculateBalancePreview('add')"
+                                class="w-full pl-8 pr-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none font-semibold transition"
+                            >
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Payment Date -->
+                    <div>
+                        <label for="modal_date" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Date <span class="text-rose-500">*</span>
+                        </label>
+                        <input
+                            type="date"
+                            name="date"
+                            id="modal_date"
+                            required
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition"
+                        >
+                    </div>
+
+                    <!-- Payment Method -->
+                    <div>
+                        <label for="modal_payment_method" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Payment Method
+                        </label>
+                        <select
+                            name="payment_method"
+                            id="modal_payment_method"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition font-medium"
+                        >
+                            <option value="Cash">Cash</option>
+                            <option value="GCash">GCash</option>
+                            <option value="Maya">Maya</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Check">Check</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Category -->
+                    <div>
+                        <label for="modal_category" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Category
+                        </label>
+                        <select
+                            name="category"
+                            id="modal_category"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition font-medium"
+                        >
+                            <option value="Rent">Rent</option>
+                            <option value="Electricity">Electricity</option>
+                            <option value="Water">Water</option>
+                            <option value="Maintenance">Maintenance</option>
+                            <option value="Security Deposit">Security Deposit</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <!-- Notes -->
+                    <div>
+                        <label for="modal_notes" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Notes / Reference (Optional)
+                        </label>
+                        <input
+                            type="text"
+                            name="notes"
+                            id="modal_notes"
+                            placeholder="e.g. Ref #123456 or Partial"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition"
+                        >
+                    </div>
+                </div>
+
+                <!-- Live Auto-Calculation Preview -->
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs font-semibold">
+                    <div>
+                        <span class="text-slate-500 uppercase tracking-wider block">Computed Balance</span>
+                        <span id="previewBalance_add" class="text-base font-bold text-slate-800">₱0.00</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-slate-500 uppercase tracking-wider block">Status</span>
+                        <span id="previewStatus_add" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-slate-200 text-slate-700">
+                            Pending
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Modal Actions -->
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-3">
+                    <button
+                        type="button"
+                        onclick="closeAddPaymentModal()"
+                        class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        class="px-5 py-2 text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 active:bg-sky-800 rounded-xl shadow-xs hover:shadow transition focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+                    >
+                        Save Payment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: EDIT PAYMENT RECORD                 -->
+<!-- ========================================== -->
+<div id="editPaymentModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="edit-modal-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity" onclick="closeEditPaymentModal()"></div>
+
+    <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+        <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-slate-200">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-4 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-base font-bold text-white tracking-tight" id="edit-modal-title">Edit Payment Record</h3>
+                </div>
+                <button type="button" onclick="closeEditPaymentModal()" class="text-white/80 hover:text-white rounded-lg p-1 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Modal Form -->
+            <form action="{{ url_for('dashboard') }}" method="POST" id="editPaymentForm" class="p-6 space-y-4">
+                
+                <input type="hidden" name="tenant_id" id="edit_modal_tenant_id" value="">
+
+                <!-- Select / Reassign Tenant -->
+                <div>
+                    <label for="edit_tenant_select" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Linked Tenant <span class="text-[11px] font-normal text-slate-400 lowercase">(optional quick selector)</span>
+                    </label>
+                    <select
+                        id="edit_tenant_select"
+                        class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition font-medium text-slate-700"
+                    >
+                        <option value="">-- Unassigned or Manual Tenant --</option>
+                        {% for opt in tenant_options %}
+                            <option
+                                value="{{ opt.id }}"
+                                data-name="{{ opt.name }}"
+                                data-room="{{ opt.room_no }}"
+                                data-rent="{{ opt.rent }}"
+                                data-status="{{ opt.status }}"
+                            >
+                                {{ opt.name }} · Room {{ opt.room_no }} (₱{{ '{:,.2f}'.format(opt.rent) }}){% if opt.status == 'Moved Out' %} [Moved Out]{% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Room Number Field -->
+                    <div>
+                        <label for="edit_room_no" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Room No. <span class="text-rose-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            list="existingRooms"
+                            name="room_no"
+                            id="edit_room_no"
+                            required
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none uppercase font-semibold transition"
+                        >
+                    </div>
+
+                    <!-- Tenant Name Field -->
+                    <div>
+                        <label for="edit_tenant_name" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Tenant Name <span class="text-rose-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            name="tenant_name"
+                            id="edit_tenant_name"
+                            required
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none capitalize transition"
+                        >
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Payment Due -->
+                    <div>
+                        <label for="edit_payment_due" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Payment Due (₱) <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-medium text-sm">₱</span>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                name="payment_due"
+                                id="edit_payment_due"
+                                required
+                                oninput="calculateBalancePreview('edit')"
+                                class="w-full pl-8 pr-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-semibold transition"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Amount Paid -->
+                    <div>
+                        <label for="edit_amount_paid" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Amount Paid (₱) <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-medium text-sm">₱</span>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                name="amount_paid"
+                                id="edit_amount_paid"
+                                required
+                                oninput="calculateBalancePreview('edit')"
+                                class="w-full pl-8 pr-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-semibold transition"
+                            >
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Date -->
+                    <div>
+                        <label for="edit_date" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Date <span class="text-rose-500">*</span>
+                        </label>
+                        <input
+                            type="date"
+                            name="date"
+                            id="edit_date"
+                            required
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition"
+                        >
+                    </div>
+
+                    <!-- Payment Method -->
+                    <div>
+                        <label for="edit_payment_method" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Payment Method
+                        </label>
+                        <select
+                            name="payment_method"
+                            id="edit_payment_method"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition font-medium"
+                        >
+                            <option value="Cash">Cash</option>
+                            <option value="GCash">GCash</option>
+                            <option value="Maya">Maya</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Check">Check</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Category -->
+                    <div>
+                        <label for="edit_category" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Category
+                        </label>
+                        <select
+                            name="category"
+                            id="edit_category"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition font-medium"
+                        >
+                            <option value="Rent">Rent</option>
+                            <option value="Electricity">Electricity</option>
+                            <option value="Water">Water</option>
+                            <option value="Maintenance">Maintenance</option>
+                            <option value="Security Deposit">Security Deposit</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <!-- Notes -->
+                    <div>
+                        <label for="edit_notes" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Notes / Reference (Optional)
+                        </label>
+                        <input
+                            type="text"
+                            name="notes"
+                            id="edit_notes"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition"
+                        >
+                    </div>
+                </div>
+
+                <!-- Live Auto-Calculation Preview -->
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs font-semibold">
+                    <div>
+                        <span class="text-slate-500 uppercase tracking-wider block">Computed Balance</span>
+                        <span id="previewBalance_edit" class="text-base font-bold text-slate-800">₱0.00</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-slate-500 uppercase tracking-wider block">Status</span>
+                        <span id="previewStatus_edit" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-slate-200 text-slate-700">
+                            Pending
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Modal Actions -->
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-3">
+                    <button
+                        type="button"
+                        onclick="closeEditPaymentModal()"
+                        class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        class="px-5 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 active:bg-amber-800 rounded-xl shadow-xs hover:shadow transition focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                    >
+                        Update Record
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: DELETE CONFIRMATION                 -->
+<!-- ========================================== -->
+<div id="deleteModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="delete-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity" onclick="closeDeleteModal()"></div>
+
+    <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+        <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md border border-slate-200 p-6 space-y-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900" id="delete-title">Delete Payment Record</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">This action permanently deletes the transaction.</p>
+                </div>
+            </div>
+
+            <p class="text-sm text-slate-600">
+                Are you sure you want to permanently delete the payment entry for
+                <span id="deleteTenantName" class="font-bold text-slate-900"></span> in
+                <span id="deleteRoomNo" class="font-bold text-slate-900"></span>?
+            </p>
+
+            <!-- Delete Form -->
+            <form id="deleteForm" method="POST" action="{{ url_for('dashboard') }}" class="pt-2 flex items-center justify-end space-x-3">
+                
+                <button
+                    type="button"
+                    onclick="closeDeleteModal()"
+                    class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    class="px-5 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-xl shadow-xs hover:shadow transition focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2"
+                >
+                    Delete Record
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Embedded tenant directory for instant client-side lookup
+    const tenantOptionsList = {{ tenant_options|tojson }};
+
+    // Helper to format date strings into YYYY-MM-DD for HTML5 date inputs
+    function normalizeDateForInput(dateStr) {
+        if (!dateStr) return '';
+        dateStr = String(dateStr).trim();
+        if (dateStr.includes('-')) {
+            const parts = dateStr.split('-');
+            if (parts.length === 3 && parts[0].length === 4) return dateStr;
+        }
+        if (dateStr.includes('/')) {
+            const parts = dateStr.split('/');
+            if (parts.length === 3) {
+                const y = parts[2].length === 4 ? parts[2] : '20' + parts[2];
+                const m = parts[0].padStart(2, '0');
+                const d = parts[1].padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+        }
+        return dateStr;
+    }
+
+    // Set default date to today in the add payment form & setup listeners
+    document.addEventListener('DOMContentLoaded', () => {
+        const dateInput = document.getElementById('modal_date');
+        if (dateInput && !dateInput.value) {
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.value = today;
+        }
+
+        // Set Collection Rate progress bar width smoothly without inline style issues
+        const rateBar = document.getElementById('collectionRateBar');
+        if (rateBar) {
+            const rate = Math.min(100, Math.max(0, parseFloat(rateBar.dataset.rate) || 0));
+            rateBar.style.width = rate + '%';
+        }
+
+        // Connected Tenant Selection logic for Add Payment Modal
+        const tenantSelect = document.getElementById('modal_tenant_select');
+        const roomInput = document.getElementById('modal_room_no');
+        const tenantNameInput = document.getElementById('modal_tenant_name');
+        const tenantIdInput = document.getElementById('modal_tenant_id');
+        const dueInput = document.getElementById('modal_payment_due');
+        const paidInput = document.getElementById('modal_amount_paid');
+
+        if (tenantSelect) {
+            tenantSelect.addEventListener('change', () => {
+                const selectedOpt = tenantSelect.options[tenantSelect.selectedIndex];
+                if (selectedOpt && selectedOpt.value) {
+                    const room = selectedOpt.dataset.room || '';
+                    const name = selectedOpt.dataset.name || '';
+                    const rent = selectedOpt.dataset.rent || '';
+
+                    tenantIdInput.value = selectedOpt.value;
+                    roomInput.value = room;
+                    tenantNameInput.value = name;
+                    dueInput.value = rent;
+                    if (!paidInput.value || parseFloat(paidInput.value) === 0) {
+                        paidInput.value = rent;
+                    }
+                    calculateBalancePreview('add');
+                } else {
+                    tenantIdInput.value = '';
+                }
+            });
+        }
+
+        // Reverse lookup: when typing room no., auto-match active tenant
+        if (roomInput) {
+            const matchRoomToTenant = () => {
+                const val = (roomInput.value || '').trim().toUpperCase();
+                if (!val) return;
+                const matched = tenantOptionsList.find(t => t.room_no.toUpperCase() === val && t.status === 'Active');
+                if (matched) {
+                    if (tenantSelect) tenantSelect.value = matched.id;
+                    tenantIdInput.value = matched.id;
+                    if (!tenantNameInput.value) tenantNameInput.value = matched.name;
+                    if (!dueInput.value || parseFloat(dueInput.value) === 0) {
+                        dueInput.value = matched.rent;
+                        paidInput.value = matched.rent;
+                    }
+                    calculateBalancePreview('add');
+                }
+            };
+            roomInput.addEventListener('input', matchRoomToTenant);
+            roomInput.addEventListener('change', matchRoomToTenant);
+        }
+
+        // Connected Tenant Selection logic for Edit Payment Modal
+        const editTenantSelect = document.getElementById('edit_tenant_select');
+        const editTenantId = document.getElementById('edit_modal_tenant_id');
+        const editRoomInput = document.getElementById('edit_room_no');
+        const editNameInput = document.getElementById('edit_tenant_name');
+
+        if (editTenantSelect) {
+            editTenantSelect.addEventListener('change', () => {
+                const selectedOpt = editTenantSelect.options[editTenantSelect.selectedIndex];
+                if (selectedOpt && selectedOpt.value) {
+                    editTenantId.value = selectedOpt.value;
+                    if (selectedOpt.dataset.room) editRoomInput.value = selectedOpt.dataset.room;
+                    if (selectedOpt.dataset.name) editNameInput.value = selectedOpt.dataset.name;
+                    if (selectedOpt.dataset.rent && (!document.getElementById('edit_payment_due').value || parseFloat(document.getElementById('edit_payment_due').value) === 0)) {
+                        document.getElementById('edit_payment_due').value = selectedOpt.dataset.rent;
+                    }
+                    calculateBalancePreview('edit');
+                } else {
+                    editTenantId.value = '';
+                }
+            });
+        }
+
+        // Check for quick URL action parameters (?record_payment=1&tenant_id=...&room=...)
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('record_payment') === '1') {
+            openAddPaymentModal();
+            const tid = urlParams.get('tenant_id');
+            const roomParam = urlParams.get('room');
+            if (tid && tenantSelect) {
+                tenantSelect.value = tid;
+                tenantSelect.dispatchEvent(new Event('change'));
+            } else if (roomParam && roomInput) {
+                roomInput.value = roomParam;
+                roomInput.dispatchEvent(new Event('change'));
+            }
+        }
+
+        // Global Event Delegation for Edit and Delete buttons (no inline quotes issues)
+        document.addEventListener('click', (e) => {
+            const editBtn = e.target.closest('.btn-edit-payment');
+            if (editBtn) {
+                const d = editBtn.dataset;
+                openEditPaymentModal(d.id, d.room, d.tenant, d.due, d.paid, d.date, d.method, d.category, d.notes, d.tenantId);
+                return;
+            }
+
+            const delBtn = e.target.closest('.btn-delete-payment');
+            if (delBtn) {
+                const d = delBtn.dataset;
+                confirmDeleteRecord(d.id, d.tenant, d.room);
+                return;
+            }
+        });
+    });
+
+    // Room Filter selector redirect
+    function handleRoomFilter(roomValue) {
+        if (roomValue) {
+            window.location.href = "{{ url_for('dashboard') }}?room=" + encodeURIComponent(roomValue);
+        } else {
+            window.location.href = "{{ url_for('dashboard') }}";
+        }
+    }
+
+    // Modal Control: Add Payment
+    function openAddPaymentModal() {
+        const modal = document.getElementById('addPaymentModal');
+        modal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+        calculateBalancePreview('add');
+        setTimeout(() => document.getElementById('modal_room_no').focus(), 50);
+    }
+
+    function closeAddPaymentModal() {
+        const modal = document.getElementById('addPaymentModal');
+        modal.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+
+    // Modal Control: Edit Payment
+    function openEditPaymentModal(id, room, tenant, due, paid, date, method, category, notes, tenantId) {
+        const modal = document.getElementById('editPaymentModal');
+        const form = document.getElementById('editPaymentForm');
+
+        form.action = "{{ url_for('edit_payment', payment_id='__ID__') }}".replace('__ID__', id);
+
+        document.getElementById('edit_modal_tenant_id').value = tenantId || '';
+        const editSelect = document.getElementById('edit_tenant_select');
+        if (editSelect) {
+            editSelect.value = tenantId || '';
+            if (!editSelect.value && room) {
+                const match = tenantOptionsList.find(t => t.room_no.toUpperCase() === (room || '').toUpperCase());
+                if (match) editSelect.value = match.id;
+            }
+        }
+
+        document.getElementById('edit_room_no').value = room || '';
+        document.getElementById('edit_tenant_name').value = tenant || '';
+        document.getElementById('edit_payment_due').value = due || '';
+        document.getElementById('edit_amount_paid').value = paid || '';
+        document.getElementById('edit_date').value = normalizeDateForInput(date);
+        document.getElementById('edit_payment_method').value = method || 'Cash';
+        document.getElementById('edit_category').value = category || 'Rent';
+        document.getElementById('edit_notes').value = notes || '';
+
+        modal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+        calculateBalancePreview('edit');
+    }
+
+    function closeEditPaymentModal() {
+        const modal = document.getElementById('editPaymentModal');
+        modal.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+
+    // Live Balance calculation preview in modals
+    function calculateBalancePreview(mode) {
+        const prefix = mode === 'edit' ? 'edit_' : 'modal_';
+        const target = mode === 'edit' ? 'edit' : 'add';
+
+        const due = parseFloat(document.getElementById(prefix + 'payment_due').value) || 0;
+        const paid = parseFloat(document.getElementById(prefix + 'amount_paid').value) || 0;
+        const balance = Math.max(0, due - paid);
+
+        const balanceEl = document.getElementById('previewBalance_' + target);
+        const statusEl = document.getElementById('previewStatus_' + target);
+
+        balanceEl.textContent = '₱' + balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        if (due > 0 && paid >= due) {
+            statusEl.textContent = 'Paid';
+            statusEl.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-800';
+            balanceEl.className = 'text-base font-bold text-emerald-600';
+        } else {
+            statusEl.textContent = 'Pending';
+            statusEl.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-800';
+            balanceEl.className = 'text-base font-bold text-rose-600';
+        }
+    }
+
+    // Modal Control: Delete Confirmation
+    function confirmDeleteRecord(id, tenantName, roomNo) {
+        const modal = document.getElementById('deleteModal');
+        const form = document.getElementById('deleteForm');
+        document.getElementById('deleteTenantName').textContent = tenantName;
+        document.getElementById('deleteRoomNo').textContent = "Room " + roomNo;
+
+        form.action = "{{ url_for('delete_payment', payment_id='__ID__') }}".replace('__ID__', id);
+
+        modal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    }
+
+    function closeDeleteModal() {
+        const modal = document.getElementById('deleteModal');
+        modal.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+
+    // Close modals on Escape key
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeAddPaymentModal();
+            closeEditPaymentModal();
+            closeDeleteModal();
+        }
+    });
+
+    // Client-side instant live table search filter
+    function filterPaymentsTable() {
+        const query = document.getElementById('tableSearchInput').value.toLowerCase().trim();
+        const rows = document.querySelectorAll('.payment-row');
+        let visibleCount = 0;
+
+        rows.forEach(row => {
+            const rowText = row.textContent.toLowerCase();
+            if (rowText.includes(query)) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        const noMatchMsg = document.getElementById('noMatchMessage');
+        const countBadge = document.getElementById('recordCountBadge');
+
+        if (noMatchMsg) {
+            if (visibleCount === 0 && rows.length > 0) {
+                noMatchMsg.classList.remove('hidden');
+            } else {
+                noMatchMsg.classList.add('hidden');
+            }
+        }
+
+        if (countBadge) {
+            countBadge.textContent = visibleCount + ' entries';
+        }
+    }
+</script>
+{% endblock %}

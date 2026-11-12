@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+
+{% block title %}Operating Expenses | JFJ Renthouse System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Page Header & Action Controls -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-1">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Operating Expenses</h1>
+            <p class="text-sm text-slate-500 mt-1">
+                Track repairs, utilities, permits, and upkeep for accurate Net Profit calculation.
+            </p>
+        </div>
+        <div class="flex items-center gap-2.5">
+            <a href="{{ url_for('analytics') }}" class="inline-flex items-center px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl border border-slate-200 shadow-xs hover:shadow transition">
+                <svg class="w-4 h-4 mr-2 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+                View Analytics
+            </a>
+            <button type="button" onclick="openAddExpenseModal()" class="inline-flex items-center px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-sm font-semibold rounded-xl shadow-xs hover:shadow transition focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Record Expense
+            </button>
+        </div>
+    </div>
+
+    <!-- Expense KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+        
+        <!-- Total Operating Expenses -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold tracking-wider text-slate-500 uppercase">Total Expenses</span>
+                <div class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-3">
+                <div class="text-2xl font-extrabold text-rose-600 tracking-tight">₱{{ "{:,.2f}".format(total_expenses) }}</div>
+                <p class="text-xs text-slate-500 mt-1">Total recorded operating costs</p>
+            </div>
+        </div>
+
+        <!-- Total Entries -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold tracking-wider text-slate-500 uppercase">Expense Transactions</span>
+                <div class="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-3">
+                <div class="text-2xl font-extrabold text-slate-900 tracking-tight">{{ expenses|length }}</div>
+                <p class="text-xs text-slate-500 mt-1">Logged operational expenses</p>
+            </div>
+        </div>
+
+        <!-- Top Category -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold tracking-wider text-slate-500 uppercase">Top Category</span>
+                <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-3">
+                <div class="text-lg font-extrabold text-slate-900 truncate">
+                    {{ categories[0].category if categories else 'None' }}
+                </div>
+                <p class="text-xs text-amber-600 font-bold mt-1">
+                    ₱{{ "{:,.2f}".format(categories[0].total if categories else 0) }}
+                </p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Expenses Table Card -->
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="flex items-center space-x-2">
+                <h2 class="text-base font-bold text-slate-900">Expenses History</h2>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                    {{ expenses|length }} items
+                </span>
+            </div>
+            <div class="flex items-center gap-2">
+                <label for="expenseRoomFilter" class="text-xs font-semibold text-slate-500 whitespace-nowrap">Filter Unit:</label>
+                <select
+                    id="expenseRoomFilter"
+                    onchange="handleExpenseRoomFilter(this.value)"
+                    class="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-700 outline-none focus:ring-2 focus:ring-rose-500"
+                >
+                    <option value="">All Units &amp; Areas</option>
+                    {% for r in rooms %}
+                        <option value="{{ r }}" {% if selected_room == r %}selected{% endif %}>Room {{ r }}</option>
+                    {% endfor %}
+                </select>
+                {% if selected_room %}
+                    <a href="{{ url_for('expenses') }}" class="text-xs text-rose-600 hover:text-rose-700 font-semibold underline">Clear</a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if expenses and expenses|length > 0 %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead>
+                        <tr class="bg-slate-50/75 border-b border-slate-200/80 text-xs uppercase font-semibold text-slate-500 tracking-wider">
+                            <th class="py-3.5 px-6">Date</th>
+                            <th class="py-3.5 px-6">Description / Item</th>
+                            <th class="py-3.5 px-6">Category</th>
+                            <th class="py-3.5 px-6">Unit / Tenant</th>
+                            <th class="py-3.5 px-6 text-right">Amount (₱)</th>
+                            <th class="py-3.5 px-6 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for exp in expenses %}
+                            <tr class="hover:bg-slate-50/70 transition-colors">
+                                <td class="py-4 px-6 whitespace-nowrap text-xs text-slate-600 font-medium">
+                                    {{ exp.date }}
+                                </td>
+                                <td class="py-4 px-6 whitespace-nowrap">
+                                    <span class="font-bold text-slate-900 block">{{ exp.title }}</span>
+                                    {% if exp.notes %}
+                                        <span class="text-xs text-slate-400 italic">{{ exp.notes }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-4 px-6 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                        {{ exp.category or 'General' }}
+                                    </span>
+                                </td>
+                                <td class="py-4 px-6 whitespace-nowrap">
+                                    {% if exp.room_no %}
+                                        <div class="flex items-center space-x-2">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                                                Room {{ exp.room_no }}
+                                            </span>
+                                            {% if exp.tenant_name %}
+                                                <span class="text-xs font-medium text-slate-700">{{ exp.tenant_name }}</span>
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                                            Building-Wide
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-4 px-6 whitespace-nowrap text-right font-extrabold text-rose-600">
+                                    ₱{{ "{:,.2f}".format(exp.amount|float) }}
+                                </td>
+                                <td class="py-4 px-6 whitespace-nowrap text-center">
+                                    <button
+                                        type="button"
+                                        onclick="confirmDeleteExpense('{{ exp._id }}', '{{ exp.title|escape }}', '{{ exp.amount }}')"
+                                        class="inline-flex items-center justify-center p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                        title="Delete Expense"
+                                    >
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        </svg>
+                                    </button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <!-- Empty state -->
+            <div class="text-center py-16 px-4">
+                <div class="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-100 text-rose-500 flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
+                </div>
+                <h3 class="text-base font-bold text-slate-800">No operating expenses logged yet</h3>
+                <p class="text-sm text-slate-500 max-w-sm mx-auto mt-1 mb-6">
+                    Recording property maintenance and utility bills enables accurate Net Profit and margin analytics.
+                </p>
+                <button type="button" onclick="openAddExpenseModal()" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold rounded-xl shadow transition">
+                    Record First Expense
+                </button>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: ADD EXPENSE                         -->
+<!-- ========================================== -->
+<div id="addExpenseModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="expense-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity" onclick="closeAddExpenseModal()"></div>
+
+    <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+        <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md border border-slate-200">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-rose-600 to-pink-600 px-6 py-4 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-base font-bold text-white tracking-tight" id="expense-title">Record Operating Expense</h3>
+                </div>
+                <button type="button" onclick="closeAddExpenseModal()" class="text-white/80 hover:text-white rounded-lg p-1 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Modal Form -->
+            <form action="{{ url_for('add_expense') }}" method="POST" id="addExpenseForm" class="p-6 space-y-4">
+                
+                <!-- Associated Unit & Tenant (Direct Cost Attribution) -->
+                <div>
+                    <label for="exp_tenant_target" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Associated Unit &amp; Tenant <span class="text-[11px] font-normal text-slate-400 lowercase">(optional cost attribution)</span>
+                    </label>
+                    <select
+                        name="tenant_target"
+                        id="exp_tenant_target"
+                        class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition font-medium text-slate-700"
+                    >
+                        <option value="">🏢 Building-Wide (Common areas, taxes, main utilities)</option>
+                        <optgroup label="Active Tenants (Specific Unit Attribution)">
+                            {% for opt in tenant_options %}
+                                <option value="{{ opt.id }}" data-room="{{ opt.room_no }}" data-name="{{ opt.name }}">
+                                    Room {{ opt.room_no }} · {{ opt.name }}
+                                </option>
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="Physical Rooms (General Unit Upkeep)">
+                            {% for r in rooms %}
+                                <option value="room:{{ r }}" data-room="{{ r }}">
+                                    Room {{ r }} (General unit cost)
+                                </option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="exp_title" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Expense Description <span class="text-rose-500">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        name="title"
+                        id="exp_title"
+                        required
+                        placeholder="e.g. Water Pump Repair, Common Hallway Lights"
+                        class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition font-medium"
+                    >
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="exp_amount" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Amount (₱) <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-medium text-sm">₱</span>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                name="amount"
+                                id="exp_amount"
+                                required
+                                placeholder="0.00"
+                                class="w-full pl-8 pr-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none font-semibold transition"
+                            >
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="exp_category" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Category
+                        </label>
+                        <select
+                            name="category"
+                            id="exp_category"
+                            class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition font-medium"
+                        >
+                            <option value="Maintenance & Repairs">Maintenance &amp; Repairs</option>
+                            <option value="Utilities">Utilities</option>
+                            <option value="Taxes & Permits">Taxes &amp; Permits</option>
+                            <option value="Cleaning & Supplies">Cleaning &amp; Supplies</option>
+                            <option value="Staff & Services">Staff &amp; Services</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="exp_date" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Date <span class="text-rose-500">*</span>
+                    </label>
+                    <input
+                        type="date"
+                        name="date"
+                        id="exp_date"
+                        required
+                        class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition"
+                    >
+                </div>
+
+                <div>
+                    <label for="exp_notes" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Notes / Receipt Ref (Optional)
+                    </label>
+                    <input
+                        type="text"
+                        name="notes"
+                        id="exp_notes"
+                        placeholder="e.g. Official Receipt #4589"
+                        class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition"
+                    >
+                </div>
+
+                <!-- Modal Actions -->
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-3">
+                    <button
+                        type="button"
+                        onclick="closeAddExpenseModal()"
+                        class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        class="px-5 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-xl shadow-xs hover:shadow transition focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2"
+                    >
+                        Save Expense
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: DELETE EXPENSE                      -->
+<!-- ========================================== -->
+<div id="deleteExpenseModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="delete-exp-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity" onclick="closeDeleteExpenseModal()"></div>
+
+    <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+        <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md border border-slate-200 p-6 space-y-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900" id="delete-exp-title">Delete Expense Entry</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">This action permanently deletes the expense.</p>
+                </div>
+            </div>
+
+            <p class="text-sm text-slate-600">
+                Are you sure you want to delete <span id="deleteExpTitle" class="font-bold text-slate-900"></span>
+                (₱<span id="deleteExpAmount" class="font-bold text-rose-600"></span>)?
+            </p>
+
+            <!-- Delete Form -->
+            <form id="deleteExpenseForm" method="POST" action="" class="pt-2 flex items-center justify-end space-x-3">
+                
+                <button
+                    type="button"
+                    onclick="closeDeleteExpenseModal()"
+                    class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    class="px-5 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-xl shadow-xs hover:shadow transition focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2"
+                >
+                    Delete Expense
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function handleExpenseRoomFilter(val) {
+        if (val) {
+            window.location.href = "{{ url_for('expenses') }}?room=" + encodeURIComponent(val);
+        } else {
+            window.location.href = "{{ url_for('expenses') }}";
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const dateInput = document.getElementById('exp_date');
+        if (dateInput && !dateInput.value) {
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.value = today;
+        }
+
+        // Support quick URL opening from tenant directory (?record_expense=1&tenant_id=...&room=...)
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('record_expense') === '1') {
+            openAddExpenseModal();
+            const tid = urlParams.get('tenant_id');
+            const roomParam = urlParams.get('room');
+            const targetSelect = document.getElementById('exp_tenant_target');
+            if (targetSelect) {
+                if (tid && targetSelect.querySelector(`option[value="${tid}"]`)) {
+                    targetSelect.value = tid;
+                } else if (roomParam && targetSelect.querySelector(`option[value="room:${roomParam}"]`)) {
+                    targetSelect.value = `room:${roomParam}`;
+                }
+            }
+        }
+    });
+
+    function openAddExpenseModal() {
+        const modal = document.getElementById('addExpenseModal');
+        modal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+        setTimeout(() => document.getElementById('exp_title').focus(), 50);
+    }
+
+    function closeAddExpenseModal() {
+        const modal = document.getElementById('addExpenseModal');
+        modal.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+
+    function confirmDeleteExpense(id, title, amount) {
+        const modal = document.getElementById('deleteExpenseModal');
+        const form = document.getElementById('deleteExpenseForm');
+        document.getElementById('deleteExpTitle').textContent = title;
+        document.getElementById('deleteExpAmount').textContent = Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2 });
+
+        form.action = "{{ url_for('delete_expense', expense_id='__ID__') }}".replace('__ID__', id);
+
+        modal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    }
+
+    function closeDeleteExpenseModal() {
+        const modal = document.getElementById('deleteExpenseModal');
+        modal.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeAddExpenseModal();
+            closeDeleteExpenseModal();
+        }
+    });
+</script>
+{% endblock %}
+
